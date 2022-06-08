@@ -22,6 +22,18 @@
             height: 100vh;
         }
 
+        h1 {
+            font-size: 28px;
+        }
+
+        h2 {
+            font-size: 24px;
+        }
+
+        h3 {
+            font-size: 20px;
+        }
+
         header {
             background: darkcyan;
             grid-area: header;
@@ -50,14 +62,51 @@
         .channels {
 
         }
+
+        .channels li {
+            cursor: pointer;
+        }
+
+        .channels li.active {
+            font-weight: bold;
+            color: red;
+        }
     </style>
 
     <script>
         let token = "51e8a6109f115d9f6c39d4e0d134f0363fec3335cff5081a6d39ac85007c9215";
         let socket = new WebSocket("ws://localhost:8924/socket");
+        let currentChannel = null;
+        let currentThread = null;
+        let currentUser = null;
         let messagesChannel = {};
         let messagesThread = {};
-        
+
+        document.onclick = function (ev) {
+            switch (ev.target.dataset.type) {
+                case "channel":
+                    let id = ev.target.dataset.id
+                    let el = document.querySelector(`[data-type='channel'][data-id='${id}']`)
+
+                    currentChannel = id
+                    currentThread = null
+                    currentUser = null
+
+                    document.querySelectorAll("[data-type='channel']").forEach((v) => {
+                        v.classList.remove('active')
+                    });
+
+                    el.classList.add('active')
+                    loadChannelMessages(id)
+                    break;
+            }
+        }
+
+        function loadChannelMessages(channelId) {
+            let main = document.querySelector('main');
+
+            main.innerHTML = `MESSAGES OF CHANNEL ${channelId}`
+        }
 
         socket.onopen = function (ev) {
             console.log("OPEN");
@@ -84,10 +133,9 @@
                 let channels = document.querySelector(".channels");
                 channels.innerHTML = null
 
-                for (let i = 0; i < msg.data.length; i++) {
-                    let ch = msg.data[i];
-                    channels.innerHTML += `<li data-id="${ch.id}">${ch.title}</li>`;
-                }
+                msg.data.forEach(function (v) {
+                    channels.innerHTML += `<li data-type="channel" data-id="${v.id}">${v.title}</li>`;
+                });
             }
         };
 
