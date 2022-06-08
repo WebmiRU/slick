@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"prj1/db"
-	_ "prj1/db"
 )
 
 type Message struct {
@@ -14,6 +13,12 @@ type Message struct {
 	Token  string `json:"token"`
 	Target string `json:"target"`
 	Text   string `json:"text"`
+}
+
+type ResponseData struct {
+	Type   string      `json:"type"`
+	Target string      `json:"target"`
+	Data   interface{} `json:"data"`
 }
 
 var upgrader = websocket.Upgrader{} // use default options
@@ -38,7 +43,6 @@ func processMessage(message Message, conn *websocket.Conn) {
 			if user == nil {
 				fmt.Println("User AUTH error")
 				//conn.Close()
-
 				return
 			} else {
 				users[conn] = user
@@ -46,6 +50,16 @@ func processMessage(message Message, conn *websocket.Conn) {
 		}
 
 		fmt.Println(users[conn].Nick)
+
+	case "REQUEST":
+		switch message.Target {
+		case "CHANNEL_LIST":
+			conn.WriteJSON(ResponseData{
+				Type:   "RESPONSE",
+				Target: "CHANNEL_LIST",
+				Data:   db.UserChannelList(1),
+			})
+		}
 
 	default:
 		fmt.Println("OTHER MESSAGE")
@@ -84,8 +98,6 @@ func home(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	db.Test1()
-
 	http.HandleFunc("/socket", socketHandler)
 	http.HandleFunc("/SOCKET", socketHandler)
 	http.HandleFunc("/", home)

@@ -15,6 +15,11 @@ type User struct {
 	Nick     string `db:"nick"`
 }
 
+type Channel struct {
+	Id    int64  `db:"id" json:"id"`
+	Title string `db:"title" json:"title"`
+}
+
 type Message struct {
 	Id     int64  `db:"id"`
 	Text   string `db:"text"`
@@ -41,17 +46,15 @@ func UserAuth(token string) *User {
 	return &user
 }
 
-func Test1() {
-	//db, e := sqlx.Connect("postgres", "user=postgres password=postgres dbname=slick sslmode=disable")
-	//checkError(e)
+func UserChannelList(userId int64) *[]Channel {
+	var channels []Channel
+	e = db.Select(&channels, `SELECT id, title FROM view_user_channel  WHERE user_id = $1`, userId)
 
-	message := []Message{}
-	e = db.Select(&message, "SELECT * FROM message")
-	checkError(e)
-
-	for _, v := range message {
-		fmt.Printf("%d: %v | USER_ID:%d\n", v.Id, v.Text, v.UserId)
+	if e != nil {
+		fmt.Println(e)
 	}
+
+	return &channels
 }
 
 func checkError(e error) {
