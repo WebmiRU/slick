@@ -27,10 +27,10 @@ type Message struct {
 }
 
 type MessageChannel struct {
-	Id        int64  `db:"id"`
-	UserId    int64  `db:"user_id"`
-	ChannelId int64  `db:"channel_id"`
-	Text      string `db:"text"`
+	Id        int64  `db:"id" json:"id"`
+	UserId    int64  `db:"user_id" json:"user_id"`
+	ChannelId int64  `db:"channel_id" json:"channel_id"`
+	Text      string `db:"text" json:"text"`
 }
 
 var db, e = sqlx.Connect("postgres", "user=postgres password=postgres dbname=slick sslmode=disable")

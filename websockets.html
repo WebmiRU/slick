@@ -104,10 +104,6 @@
 
         // Загрузка сообщений выбранного канала в <main>
         function loadChannelMessages(id) {
-            let main = document.querySelector('main');
-
-            main.innerHTML = `MESSAGES OF CHANNEL ${id}`;
-
             if (messagesChannel[id] === undefined) {
                 socket.send(JSON.stringify({
                     type: "REQUEST",
@@ -115,7 +111,14 @@
                     id: parseInt(id),
                 }));
             } else {
+                let main = document.querySelector('main');
 
+                main.innerHTML = null;
+
+                messagesChannel[id].forEach((v) => {
+                    console.log(v);
+                    main.innerHTML += `<div>USER_ID: ${v.user_id} | MESSAGE: ${v.text}</div>`;
+                });
             }
         }
 
@@ -150,9 +153,14 @@
             }
 
             if (msg.type == "RESPONSE" && msg.target == "CHANNEL_MESSAGES") {
-                msg.data.forEach((v) => {
-                    console.log(v);
+                messagesChannel[msg.id] = [];
+
+                // @TODO 
+                msg.data.reverse().forEach((v) => {
+                    messagesChannel[msg.id].push(v);
                 });
+
+                loadChannelMessages(msg.id);
             }
         };
 
