@@ -46,19 +46,76 @@
             grid-area: footer;
             background: darkkhaki;
         }
+
+        .channels {
+
+        }
     </style>
+
+    <script>
+        let token = "51e8a6109f115d9f6c39d4e0d134f0363fec3335cff5081a6d39ac85007c9215";
+        let socket = new WebSocket("ws://localhost:8924/socket");
+        let messagesChannel = {};
+        let messagesThread = {};
+        
+
+        socket.onopen = function (ev) {
+            console.log("OPEN");
+
+            socket.send(JSON.stringify({
+                type: "AUTH",
+                token: token,
+            }));
+        };
+
+        socket.onmessage = function (ev) {
+            console.log(ev.data);
+
+            let msg = JSON.parse(ev.data);
+
+            if (msg.type == 'SUCCESS' && msg.target == 'AUTH') {
+                socket.send(JSON.stringify({
+                    type: "REQUEST",
+                    target: "CHANNEL_LIST",
+                }));
+            }
+
+            if (msg.type == "RESPONSE" && msg.target == "CHANNEL_LIST") {
+                let channels = document.querySelector(".channels");
+                channels.innerHTML = null
+
+                for (let i = 0; i < msg.data.length; i++) {
+                    let ch = msg.data[i];
+                    channels.innerHTML += `<li data-id="${ch.id}">${ch.title}</li>`;
+                }
+            }
+        };
+
+        socket.onclose = function (ev) {
+            if (ev.wasClean) {
+                console.log("CLOSED CLEAN");
+            } else {
+                console.log("CLOSED NOT CLEAN");
+            }
+        };
+
+        socket.onerror = function (e) {
+            console.log("ERROR: " + e.message);
+        };
+    </script>
 </head>
 <body>
 <header>
-HEADER
+    HEADER
 </header>
 
 <aside id="left">
-LEFT
+    <h3>Channels</h3>
+    <ul class="channels"></ul>
 </aside>
 
 <main>
-MAIN
+    MAIN
 </main>
 
 <aside id="right">

@@ -44,9 +44,17 @@ func processMessage(message Message, conn *websocket.Conn) {
 				fmt.Println("User AUTH error")
 				//conn.Close()
 				return
-			} else {
-				users[conn] = user
 			}
+
+			fmt.Println("User auth success")
+
+			users[conn] = user
+
+			conn.WriteJSON(ResponseData{
+				Type:   "SUCCESS",
+				Target: "AUTH",
+			})
+
 		}
 
 		fmt.Println(users[conn].Nick)
