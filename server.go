@@ -12,6 +12,7 @@ type Message struct {
 	Type   string `json:"type"`
 	Token  string `json:"token"`
 	Target string `json:"target"`
+	Id     int64  `json:"id"`
 	Text   string `json:"text"`
 }
 
@@ -65,7 +66,14 @@ func processMessage(message Message, conn *websocket.Conn) {
 			conn.WriteJSON(ResponseData{
 				Type:   "RESPONSE",
 				Target: "CHANNEL_LIST",
-				Data:   db.UserChannelList(1),
+				Data:   db.GetUserChannelList(1),
+			})
+
+		case "CHANNEL_MESSAGES":
+			conn.WriteJSON(ResponseData{
+				Type:   "RESPONSE",
+				Target: "CHANNEL_MESSAGES",
+				Data:   db.GetMessageChannelList(1, message.Id),
 			})
 		}
 
@@ -82,13 +90,13 @@ func socketHandler(w http.ResponseWriter, r *http.Request) {
 	defer conn.Close()
 
 	for {
-		var m Message
-		if e = conn.ReadJSON(&m); e != nil {
+		var message Message
+		if e = conn.ReadJSON(&message); e != nil {
 			fmt.Println("Message decode error", e)
 			continue
 		}
 
-		processMessage(m, conn)
+		processMessage(message, conn)
 	}
 }
 

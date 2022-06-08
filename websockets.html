@@ -102,10 +102,21 @@
             }
         }
 
-        function loadChannelMessages(channelId) {
+        // Загрузка сообщений выбранного канала в <main>
+        function loadChannelMessages(id) {
             let main = document.querySelector('main');
 
-            main.innerHTML = `MESSAGES OF CHANNEL ${channelId}`
+            main.innerHTML = `MESSAGES OF CHANNEL ${id}`;
+
+            if (messagesChannel[id] === undefined) {
+                socket.send(JSON.stringify({
+                    type: "REQUEST",
+                    target: "CHANNEL_MESSAGES",
+                    id: parseInt(id),
+                }));
+            } else {
+
+            }
         }
 
         socket.onopen = function (ev) {
@@ -135,6 +146,12 @@
 
                 msg.data.forEach(function (v) {
                     channels.innerHTML += `<li data-type="channel" data-id="${v.id}">${v.title}</li>`;
+                });
+            }
+
+            if (msg.type == "RESPONSE" && msg.target == "CHANNEL_MESSAGES") {
+                msg.data.forEach((v) => {
+                    console.log(v);
                 });
             }
         };

@@ -26,6 +26,13 @@ type Message struct {
 	UserId int64  `db:"user_id"`
 }
 
+type MessageChannel struct {
+	Id        int64  `db:"id"`
+	UserId    int64  `db:"user_id"`
+	ChannelId int64  `db:"channel_id"`
+	Text      string `db:"text"`
+}
+
 var db, e = sqlx.Connect("postgres", "user=postgres password=postgres dbname=slick sslmode=disable")
 
 func init() {
@@ -46,7 +53,7 @@ func UserAuth(token string) *User {
 	return &user
 }
 
-func UserChannelList(userId int64) *[]Channel {
+func GetUserChannelList(userId int64) *[]Channel {
 	var channels []Channel
 	e = db.Select(&channels, `SELECT id, title FROM view_user_channel  WHERE user_id = $1`, userId)
 
@@ -55,6 +62,18 @@ func UserChannelList(userId int64) *[]Channel {
 	}
 
 	return &channels
+}
+
+func GetMessageChannelList(userId int64, channelId int64) *[]MessageChannel {
+	var messages []MessageChannel
+
+	e = db.Select(&messages, `SELECT * FROM message_channel WHERE channel_id = $1 ORDER BY id DESC`, channelId)
+
+	if e != nil {
+		fmt.Println(e)
+	}
+
+	return &messages
 }
 
 func checkError(e error) {
