@@ -13,8 +13,16 @@ type Message struct {
 	Token  string `json:"token"`
 	Target string `json:"target"`
 	Id     int64  `json:"id"`
-	Text   string `json:"text"`
+	Value  string `json:"value"`
 	Offset string `json:"offset"`
+}
+
+type TextMessage struct {
+	Type   string `json:"type"`
+	Target string `json:"target"`
+	Id     int64  `json:"id"`
+	Value  string `json:"value"`
+	UserId int64  `json:"user_id"`
 }
 
 type ResponseData struct {
@@ -77,6 +85,18 @@ func processMessage(message Message, conn *websocket.Conn) {
 				Target: "CHANNEL_MESSAGES",
 				Id:     message.Id,
 				Data:   db.GetMessageChannelList(1, message.Id),
+			})
+		}
+
+	case "MESSAGE":
+		switch message.Target {
+		case "CHANNEL":
+			conn.WriteJSON(TextMessage{
+				Type:   "MESSAGE",
+				Target: "CHANNEL",
+				Id:     message.Id,
+				Value:  message.Value,
+				UserId: 1,
 			})
 		}
 

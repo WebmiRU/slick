@@ -47,6 +47,9 @@
         main {
             grid-area: main;
             background: darkgrey;
+            display: grid;
+            grid-template-areas: "messages" "input";
+            grid-template-rows: 1fr 150px;
         }
 
         #right {
@@ -71,111 +74,13 @@
             font-weight: bold;
             color: red;
         }
+
+        #channel-input {
+            padding: 10px;
+            display: block;
+            border: 0;
+        }
     </style>
-
-    <script>
-        let token = "51e8a6109f115d9f6c39d4e0d134f0363fec3335cff5081a6d39ac85007c9215";
-        let socket = new WebSocket("ws://localhost:8924/socket");
-        let currentChannel = null;
-        let currentThread = null;
-        let currentUser = null;
-        let messagesChannel = {};
-        let messagesThread = {};
-
-        document.onclick = function (ev) {
-            switch (ev.target.dataset.type) {
-                case "channel":
-                    let id = ev.target.dataset.id
-                    let el = document.querySelector(`[data-type='channel'][data-id='${id}']`)
-
-                    currentChannel = id
-                    currentThread = null
-                    currentUser = null
-
-                    document.querySelectorAll("[data-type='channel']").forEach((v) => {
-                        v.classList.remove('active')
-                    });
-
-                    el.classList.add('active')
-                    loadChannelMessages(id)
-                    break;
-            }
-        }
-
-        // Загрузка сообщений выбранного канала в <main>
-        function loadChannelMessages(id) {
-            if (messagesChannel[id] === undefined) {
-                socket.send(JSON.stringify({
-                    type: "REQUEST",
-                    target: "CHANNEL_MESSAGES",
-                    id: parseInt(id),
-                }));
-            } else {
-                let main = document.querySelector('main');
-
-                main.innerHTML = null;
-
-                messagesChannel[id].forEach((v) => {
-                    console.log(v);
-                    main.innerHTML += `<div>USER_ID: ${v.user_id} | MESSAGE: ${v.text}</div>`;
-                });
-            }
-        }
-
-        socket.onopen = function (ev) {
-            console.log("OPEN");
-
-            socket.send(JSON.stringify({
-                type: "AUTH",
-                token: token,
-            }));
-        };
-
-        socket.onmessage = function (ev) {
-            console.log(ev.data);
-
-            let msg = JSON.parse(ev.data);
-
-            if (msg.type == 'SUCCESS' && msg.target == 'AUTH') {
-                socket.send(JSON.stringify({
-                    type: "REQUEST",
-                    target: "CHANNEL_LIST",
-                }));
-            }
-
-            if (msg.type == "RESPONSE" && msg.target == "CHANNEL_LIST") {
-                let channels = document.querySelector(".channels");
-                channels.innerHTML = null
-
-                msg.data.forEach(function (v) {
-                    channels.innerHTML += `<li data-type="channel" data-id="${v.id}">${v.title}</li>`;
-                });
-            }
-
-            if (msg.type == "RESPONSE" && msg.target == "CHANNEL_MESSAGES") {
-                messagesChannel[msg.id] = [];
-
-                // @TODO 
-                msg.data.reverse().forEach((v) => {
-                    messagesChannel[msg.id].push(v);
-                });
-
-                loadChannelMessages(msg.id);
-            }
-        };
-
-        socket.onclose = function (ev) {
-            if (ev.wasClean) {
-                console.log("CLOSED CLEAN");
-            } else {
-                console.log("CLOSED NOT CLEAN");
-            }
-        };
-
-        socket.onerror = function (e) {
-            console.log("ERROR: " + e.message);
-        };
-    </script>
 </head>
 <body>
 <header>
@@ -188,7 +93,8 @@
 </aside>
 
 <main>
-    MAIN
+    <div id="channel-messages">CHANNEL MESSAGES</div>
+    <textarea id="channel-input">Hello world!</textarea>
 </main>
 
 <aside id="right">
@@ -198,5 +104,145 @@
 <footer>
     FOOTER
 </footer>
+
+<script>
+    let token = "51e8a6109f115d9f6c39d4e0d134f0363fec3335cff5081a6d39ac85007c9215";
+    let socket = new WebSocket("ws://localhost:8924/socket");
+    let currentChannel = null;
+    let currentThread = null;
+    let currentUser = null;
+    let messagesChannel = {};
+    let messagesThread = {};
+    let channelMessageInput = document.querySelector("#channel-input");
+    let channelMessagesNode = document.querySelector('#channel-messages');
+
+    document.onclick = function (ev) {
+        switch (ev.target.dataset.type) {
+            case "channel":
+                let id = ev.target.dataset.id;
+                let el = document.querySelector(`[data-type='channel'][data-id='${id}']`);
+
+                currentChannel = id;
+                currentThread = null;
+                currentUser = null;
+
+                document.querySelectorAll("[data-type='channel']").forEach((v) => {
+                    v.classList.remove('active');
+                });
+
+                el.classList.add('active');
+                loadChannelMessages(id);
+                break;
+        }
+    }
+
+    // Отправка сообщения в канал по нажанию клавиши Enter
+    document.querySelector("#channel-input").onkeyup = function (ev) {
+        if (ev.keyCode === 13) {
+            sendChannelMessage();
+        }
+    }
+
+    // Функция отправки сообщения в канал
+    function sendChannelMessage() {
+        let message = channelMessageInput.value;
+
+        channelMessageInput.value = null;
+
+        socket.send(JSON.stringify({
+            type: "MESSAGE",
+            target: "CHANNEL",
+            id: parseInt(currentChannel),
+            value: message,
+        }));
+    }
+
+    // Загрузка сообщений выбранного канала в <main>
+    function loadChannelMessages(id) {
+        if (messagesChannel[id] === undefined) {
+            socket.send(JSON.stringify({
+                type: "REQUEST",
+                target: "CHANNEL_MESSAGES",
+                id: parseInt(id),
+            }));
+        } else {
+            let channelMessages = document.querySelector('#channel-messages');
+
+            channelMessages.innerHTML = null;
+
+            messagesChannel[id].forEach((v) => {
+                loadChannelMessage(v);
+            });
+        }
+    }
+
+    function loadChannelMessage(message) {
+        channelMessagesNode.innerHTML += `<div>USER_ID: ${message.user_id} | MESSAGE: ${message.value}</div>`;
+    }
+
+    function addChannelMessage(message) {
+        messagesChannel[message.id].push(message);
+        loadChannelMessage(message);
+    }
+
+    socket.onopen = function (ev) {
+        console.log("OPEN");
+
+        socket.send(JSON.stringify({
+            type: "AUTH",
+            token: token,
+        }));
+    };
+
+    socket.onmessage = function (ev) {
+        console.log(ev.data);
+
+        let msg = JSON.parse(ev.data);
+
+        if (msg.type == 'SUCCESS' && msg.target == 'AUTH') {
+            socket.send(JSON.stringify({
+                type: "REQUEST",
+                target: "CHANNEL_LIST",
+            }));
+        }
+
+        if (msg.type == "RESPONSE" && msg.target == "CHANNEL_LIST") {
+            let channels = document.querySelector(".channels");
+            channels.innerHTML = null
+
+            msg.data.forEach(function (v) {
+                channels.innerHTML += `<li data-type="channel" data-id="${v.id}">${v.title}</li>`;
+            });
+        }
+
+        if (msg.type == "RESPONSE" && msg.target == "CHANNEL_MESSAGES") {
+            messagesChannel[msg.id] = [];
+
+            // @TODO
+            msg.data.reverse().forEach((v) => {
+                messagesChannel[msg.id].push(v);
+            });
+
+            loadChannelMessages(msg.id);
+        }
+
+        // @TODO Написать функцию добавления (загрузки) обного сообщения в список сообщений канала
+        if (msg.type == "MESSAGE" && msg.target == "CHANNEL") {
+            addChannelMessage(msg);
+        }
+    };
+
+    socket.onclose = function (ev) {
+        if (ev.wasClean) {
+            console.log("CLOSED CLEAN");
+        } else {
+            console.log("CLOSED NOT CLEAN");
+        }
+    };
+
+    socket.onerror = function (e) {
+        console.log("ERROR: " + e.message);
+    };
+</script>
 </body>
 </html>
