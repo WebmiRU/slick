@@ -106,7 +106,13 @@
 </footer>
 
 <script>
-    let token = "51e8a6109f115d9f6c39d4e0d134f0363fec3335cff5081a6d39ac85007c9215";
+    let token = localStorage.getItem('token');
+
+    if(!token) {
+        token = "51e8a6109f115d9f6c39d4e0d134f0363fec3335cff5081a6d39ac85007c9215";
+        localStorage.setItem('token', token);
+    }
+
     let socket = new WebSocket("ws://localhost:8924/socket");
     let currentChannel = null;
     let currentThread = null;

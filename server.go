@@ -17,6 +17,12 @@ type Message struct {
 	Offset string `json:"offset"`
 }
 
+type SystemMessage struct {
+	Type    string `json:"type"`
+	Target  string `json:"target"`
+	Message string `json:"message"`
+}
+
 type TextMessage struct {
 	Type   string `json:"type"`
 	Target string `json:"target"`
@@ -53,7 +59,13 @@ func processMessage(message Message, conn *websocket.Conn) {
 
 			if user == nil {
 				fmt.Println("User AUTH error")
-				//conn.Close()
+				conn.WriteJSON(SystemMessage{
+					Type:    "ERROR",
+					Target:  "AUTH",
+					Message: "Auth error, token incorrect",
+				})
+
+				conn.Close()
 				return
 			}
 
@@ -61,9 +73,10 @@ func processMessage(message Message, conn *websocket.Conn) {
 
 			users[conn] = user
 
-			conn.WriteJSON(ResponseData{
-				Type:   "SUCCESS",
-				Target: "AUTH",
+			conn.WriteJSON(SystemMessage{
+				Type:    "SUCCESS",
+				Target:  "AUTH",
+				Message: "Auth successfully",
 			})
 
 		}
