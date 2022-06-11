@@ -40,6 +40,7 @@ type ResponseData struct {
 
 var upgrader = websocket.Upgrader{} // use default options
 var users = map[*websocket.Conn]*db.User{}
+var channels = map[int64][]*websocket.Conn{}
 
 func checkUserAuth() {
 
@@ -72,6 +73,12 @@ func processMessage(message Message, conn *websocket.Conn) {
 			fmt.Println("User auth success")
 
 			users[conn] = user
+			chs := db.GetUserChannelList(users[conn].Id)
+
+			//@TODO возможно нужен Mutex
+			for _, ch := range *chs {
+				channels[ch.Id] = append(channels[ch.Id], conn)
+			}
 
 			conn.WriteJSON(SystemMessage{
 				Type:    "SUCCESS",
@@ -89,7 +96,7 @@ func processMessage(message Message, conn *websocket.Conn) {
 			conn.WriteJSON(ResponseData{
 				Type:   "RESPONSE",
 				Target: "CHANNEL_LIST",
-				Data:   db.GetUserChannelList(1),
+				Data:   db.GetUserChannelList(users[conn].Id),
 			})
 
 		case "CHANNEL_MESSAGES":
@@ -97,20 +104,22 @@ func processMessage(message Message, conn *websocket.Conn) {
 				Type:   "RESPONSE",
 				Target: "CHANNEL_MESSAGES",
 				Id:     message.Id,
-				Data:   db.GetMessageChannelList(1, message.Id),
+				Data:   db.GetMessageChannelList(users[conn].Id, message.Id),
 			})
 		}
 
 	case "MESSAGE":
 		switch message.Target {
 		case "CHANNEL":
-			conn.WriteJSON(TextMessage{
-				Type:   "MESSAGE",
-				Target: "CHANNEL",
-				Id:     message.Id,
-				Value:  message.Value,
-				UserId: 1,
-			})
+			for _, c := range channels[message.Id] {
+				c.WriteJSON(TextMessage{
+					Type:   "MESSAGE",
+					Target: "CHANNEL",
+					Id:     message.Id, // Channel ID
+					Value:  message.Value,
+					UserId: users[conn].Id,
+				})
+			}
 		}
 
 	default:
@@ -135,8 +144,6 @@ func socketHandler(w http.ResponseWriter, r *http.Request) {
 		processMessage(message, conn)
 	}
 }
-
-//e = conn.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%s %s %s", ">>>", message, "<<<")))
 
 func checkError(e error) {
 	if e != nil {

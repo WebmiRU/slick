@@ -126,18 +126,7 @@
         switch (ev.target.dataset.type) {
             case "channel":
                 let id = ev.target.dataset.id;
-                let el = document.querySelector(`[data-type='channel'][data-id='${id}']`);
-
-                currentChannel = id;
-                currentThread = null;
-                currentUser = null;
-
-                document.querySelectorAll("[data-type='channel']").forEach((v) => {
-                    v.classList.remove('active');
-                });
-
-                el.classList.add('active');
-                loadChannelMessages(id);
+                setChannelActive(id);
                 break;
         }
     }
@@ -147,6 +136,21 @@
         if (ev.keyCode === 13) {
             sendChannelMessage();
         }
+    }
+
+    function setChannelActive(id) {
+        let el = document.querySelector(`[data-type='channel'][data-id='${id}']`);
+
+        currentChannel = id;
+        currentThread = null;
+        currentUser = null;
+
+        document.querySelectorAll("[data-type='channel']").forEach((v) => {
+            v.classList.remove('active');
+        });
+
+        el.classList.add('active');
+        loadChannelMessages(id);
     }
 
     // Функция отправки сообщения в канал
@@ -187,6 +191,7 @@
     }
 
     function addChannelMessage(message) {
+        console.log('XXX', message);
         messagesChannel[message.id].push(message);
         loadChannelMessage(message);
     }
@@ -219,6 +224,9 @@
             msg.data.forEach(function (v) {
                 channels.innerHTML += `<li data-type="channel" data-id="${v.id}">${v.title}</li>`;
             });
+
+            //@TODO Debug
+            setChannelActive(1);
         }
 
         if (msg.type == "RESPONSE" && msg.target == "CHANNEL_MESSAGES") {
@@ -232,7 +240,6 @@
             loadChannelMessages(msg.id);
         }
 
-        // @TODO Написать функцию добавления (загрузки) обного сообщения в список сообщений канала
         if (msg.type == "MESSAGE" && msg.target == "CHANNEL") {
             addChannelMessage(msg);
         }
