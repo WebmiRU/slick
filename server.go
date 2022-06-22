@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
 	"prj1/db"
+
+	"github.com/gorilla/websocket"
 )
 
 type Message struct {
@@ -120,15 +121,40 @@ func processMessage(message Message, conn *websocket.Conn) {
 					UserId: users[conn].Id,
 				})
 			}
-		}
 
+		case "PRIVATE":
+			senderId := users[conn].Id
+			receiverId := message.Id
+
+			//Getting interlocutors id from the client side request
+			interlocutorsId := map[int64]bool{senderId: true, receiverId: true}
+			//Interlocutors connections
+			var interlocutorsConn []*websocket.Conn
+
+			//Now we finding websocket connections with sender and receiver
+			for conn, user := range users {
+				if _, ok := interlocutorsId[user.Id]; ok {
+					interlocutorsConn = append(interlocutorsConn, conn)
+				}
+			}
+			for _, c := range interlocutorsConn {
+				c.WriteJSON(TextMessage{
+					Type:   "MESSAGE",
+					Target: "PRIVATE",
+					Id:     receiverId, // receiver user ID
+					Value:  message.Value,
+					UserId: senderId,
+				})
+			}
+			// db.SendPrivateMessage(message.Value, senderId, receiverId)
+		}
 	default:
 		fmt.Println("OTHER MESSAGE")
 	}
 }
 
 func socketHandler(w http.ResponseWriter, r *http.Request) {
-	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true } // allow any connections into websocket
 	conn, e := upgrader.Upgrade(w, r, nil)
 	checkError(e)
 
