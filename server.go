@@ -127,7 +127,7 @@ func processMessage(message Message, conn *websocket.Conn) {
 			receiverId := message.Id
 
 			//Getting interlocutors id from the client side request
-			interlocutorsId := map[int64]bool{senderId: true, receiverId: true}
+			interlocutorsId := map[int64]struct{}{senderId: {}, receiverId: {}}
 			//Interlocutors connections
 			var interlocutorsConn []*websocket.Conn
 
