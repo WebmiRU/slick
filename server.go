@@ -41,6 +41,7 @@ type ResponseData struct {
 
 var upgrader = websocket.Upgrader{} // use default options
 var users = map[*websocket.Conn]*db.User{}
+var usersID = map[int64]*websocket.Conn{}
 var channels = map[int64][]*websocket.Conn{}
 
 func checkUserAuth() {
@@ -74,6 +75,7 @@ func processMessage(message Message, conn *websocket.Conn) {
 			fmt.Println("User auth success")
 
 			users[conn] = user
+			usersID[user.Id] = conn
 			chs := db.GetUserChannelList(users[conn].Id)
 
 			//@TODO возможно нужен Mutex
@@ -126,27 +128,21 @@ func processMessage(message Message, conn *websocket.Conn) {
 			senderId := users[conn].Id
 			receiverId := message.Id
 
-			//Getting interlocutors id from the client side request
-			interlocutorsId := map[int64]struct{}{senderId: {}, receiverId: {}}
-			//Interlocutors connections
-			var interlocutorsConn []*websocket.Conn
+			usersID[senderId].WriteJSON(TextMessage{
+				Type:   "MESSAGE",
+				Target: "PRIVATE",
+				Id:     receiverId, // receiver user ID
+				Value:  message.Value,
+				UserId: senderId,
+			})
 
-			//Now we finding websocket connections with sender and receiver
-			for conn, user := range users {
-				if _, ok := interlocutorsId[user.Id]; ok {
-					interlocutorsConn = append(interlocutorsConn, conn)
-				}
-			}
-			for _, c := range interlocutorsConn {
-				c.WriteJSON(TextMessage{
-					Type:   "MESSAGE",
-					Target: "PRIVATE",
-					Id:     receiverId, // receiver user ID
-					Value:  message.Value,
-					UserId: senderId,
-				})
-			}
-			// db.SendPrivateMessage(message.Value, senderId, receiverId)
+			usersID[receiverId].WriteJSON(TextMessage{
+				Type:   "MESSAGE",
+				Target: "PRIVATE",
+				Id:     receiverId, // receiver user ID
+				Value:  message.Value,
+				UserId: senderId,
+			})
 		}
 	default:
 		fmt.Println("OTHER MESSAGE")
