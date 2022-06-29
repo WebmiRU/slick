@@ -133,16 +133,27 @@ func socketHandler(w http.ResponseWriter, r *http.Request) {
 	checkError(e)
 
 	defer conn.Close()
+	conn.SetCloseHandler(socketCloseHandler)
 
 	for {
 		var message Message
 		if e = conn.ReadJSON(&message); e != nil {
 			fmt.Println("Message decode error", e)
-			continue
+			break
 		}
 
 		processMessage(message, conn)
 	}
+}
+
+func socketCloseHandler(code int, text string) error {
+	fmt.Println("SOCKET CLOSE!", code, text)
+	return nil
+}
+
+//@TODO Удалить пользователя из списка активных соединений
+func userDisconnect() {
+
 }
 
 func checkError(e error) {
