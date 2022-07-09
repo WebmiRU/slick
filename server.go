@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
 	"prj1/db"
+
+	"github.com/gorilla/websocket"
 )
 
 type Message struct {
@@ -40,6 +41,7 @@ type ResponseData struct {
 
 var upgrader = websocket.Upgrader{} // use default options
 var users = map[*websocket.Conn]*db.User{}
+var usersID = map[int64]*websocket.Conn{}
 var channels = map[int64][]*websocket.Conn{}
 
 func checkUserAuth() {
@@ -73,6 +75,7 @@ func processMessage(message Message, conn *websocket.Conn) {
 			fmt.Println("User auth success")
 
 			users[conn] = user
+			usersID[user.Id] = conn
 			chs := db.GetUserChannelList(users[conn].Id)
 
 			//@TODO возможно нужен Mutex
@@ -120,15 +123,34 @@ func processMessage(message Message, conn *websocket.Conn) {
 					UserId: users[conn].Id,
 				})
 			}
-		}
 
+		case "PRIVATE":
+			senderId := users[conn].Id
+			receiverId := message.Id
+
+			usersID[senderId].WriteJSON(TextMessage{
+				Type:   "MESSAGE",
+				Target: "PRIVATE",
+				Id:     receiverId, // receiver user ID
+				Value:  message.Value,
+				UserId: senderId,
+			})
+
+			usersID[receiverId].WriteJSON(TextMessage{
+				Type:   "MESSAGE",
+				Target: "PRIVATE",
+				Id:     receiverId, // receiver user ID
+				Value:  message.Value,
+				UserId: senderId,
+			})
+		}
 	default:
 		fmt.Println("OTHER MESSAGE")
 	}
 }
 
 func socketHandler(w http.ResponseWriter, r *http.Request) {
-	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true } // allow any connections into websocket
 	conn, e := upgrader.Upgrade(w, r, nil)
 	checkError(e)
 

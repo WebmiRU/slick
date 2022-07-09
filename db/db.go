@@ -2,9 +2,10 @@ package db
 
 import (
 	"fmt"
+	"log"
+
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	"log"
 )
 
 type User struct {
@@ -74,6 +75,10 @@ func GetMessageChannelList(userId int64, channelId int64) *[]MessageChannel {
 	}
 
 	return &messages
+}
+
+func SavePrivateMessage() {
+
 }
 
 func checkError(e error) {
