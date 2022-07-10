@@ -2,9 +2,10 @@ package db
 
 import (
 	"fmt"
+	"log"
+
 	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
-	"log"
 )
 
 type User struct {
@@ -74,6 +75,14 @@ func GetMessageChannelList(userId int64, channelId int64) *[]MessageChannel {
 	}
 
 	return &messages
+}
+
+func SavePrivateMessage(senderId int64, receiverId int64, msg string) {
+	_, e = db.Exec(`INSERT INTO private_message (sender_id, receiver_id, "value") VALUES ($1, $2, $3)`, senderId, receiverId, msg)
+
+	if e != nil {
+		fmt.Println(e)
+	}
 }
 
 func checkError(e error) {
