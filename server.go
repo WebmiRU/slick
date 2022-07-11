@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/gorilla/websocket"
 	"log"
 	"net/http"
 	"prj1/db"
+
+	"github.com/gorilla/websocket"
 )
 
 type Message struct {
@@ -40,6 +41,7 @@ type ResponseData struct {
 
 var upgrader = websocket.Upgrader{} // use default options
 var users = map[*websocket.Conn]*db.User{}
+var connections = map[int64]*websocket.Conn{}
 var channels = map[int64][]*websocket.Conn{}
 
 func checkUserAuth() {
@@ -73,6 +75,7 @@ func processMessage(message Message, conn *websocket.Conn) {
 			fmt.Println("User auth success")
 
 			users[conn] = user
+			connections[user.Id] = conn
 			chs := db.GetUserChannelList(users[conn].Id)
 
 			//@TODO возможно нужен Mutex
@@ -120,15 +123,45 @@ func processMessage(message Message, conn *websocket.Conn) {
 					UserId: users[conn].Id,
 				})
 			}
-		}
 
+		case "PRIVATE":
+			receiverId := message.Id
+			var senderId int64
+
+			_, isSenderConnected := users[conn]
+			if isSenderConnected {
+				senderId = users[conn].Id
+			}
+
+			if isSenderConnected {
+				connections[senderId].WriteJSON(TextMessage{
+					Type:   "MESSAGE",
+					Target: "PRIVATE",
+					Id:     receiverId, // receiver user ID
+					Value:  message.Value,
+					UserId: senderId,
+				})
+			}
+
+			if _, isReceiverConnected := connections[message.Id]; isReceiverConnected {
+				connections[receiverId].WriteJSON(TextMessage{
+					Type:   "MESSAGE",
+					Target: "PRIVATE",
+					Id:     receiverId, // receiver user ID
+					Value:  message.Value,
+					UserId: senderId,
+				})
+			}
+
+			db.SavePrivateMessage(senderId, receiverId, message.Value)
+		}
 	default:
 		fmt.Println("OTHER MESSAGE")
 	}
 }
 
 func socketHandler(w http.ResponseWriter, r *http.Request) {
-	upgrader.CheckOrigin = func(r *http.Request) bool { return true }
+	upgrader.CheckOrigin = func(r *http.Request) bool { return true } // allow any connections into websocket
 	conn, e := upgrader.Upgrade(w, r, nil)
 	checkError(e)
 
@@ -152,8 +185,17 @@ func socketCloseHandler(code int, text string) error {
 }
 
 //@TODO Удалить пользователя из списка активных соединений
-func userDisconnect() {
+func userDisconnect(conn *websocket.Conn, userId int64) {
+	delete(users, conn)
+	delete(connections, userId)
 
+	for _, channel := range channels {
+		for i, userConn := range channel {
+			if userConn == conn {
+				channel = append(channel[:i], channel[i+1:]...)
+			}
+		}
+	}
 }
 
 func checkError(e error) {
