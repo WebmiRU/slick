@@ -125,24 +125,33 @@ func processMessage(message Message, conn *websocket.Conn) {
 			}
 
 		case "PRIVATE":
-			senderId := users[conn].Id
 			receiverId := message.Id
+			var senderId int64
 
-			connections[senderId].WriteJSON(TextMessage{
-				Type:   "MESSAGE",
-				Target: "PRIVATE",
-				Id:     receiverId, // receiver user ID
-				Value:  message.Value,
-				UserId: senderId,
-			})
+			_, isSenderConnected := users[conn]
+			if isSenderConnected {
+				senderId = users[conn].Id
+			}
 
-			connections[receiverId].WriteJSON(TextMessage{
-				Type:   "MESSAGE",
-				Target: "PRIVATE",
-				Id:     receiverId, // receiver user ID
-				Value:  message.Value,
-				UserId: senderId,
-			})
+			if isSenderConnected {
+				connections[senderId].WriteJSON(TextMessage{
+					Type:   "MESSAGE",
+					Target: "PRIVATE",
+					Id:     receiverId, // receiver user ID
+					Value:  message.Value,
+					UserId: senderId,
+				})
+			}
+
+			if _, isReceiverConnected := connections[message.Id]; isReceiverConnected {
+				connections[receiverId].WriteJSON(TextMessage{
+					Type:   "MESSAGE",
+					Target: "PRIVATE",
+					Id:     receiverId, // receiver user ID
+					Value:  message.Value,
+					UserId: senderId,
+				})
+			}
 
 			db.SavePrivateMessage(senderId, receiverId, message.Value)
 		}
@@ -176,8 +185,17 @@ func socketCloseHandler(code int, text string) error {
 }
 
 //@TODO Удалить пользователя из списка активных соединений
-func userDisconnect() {
+func userDisconnect(conn *websocket.Conn, userId int64) {
+	delete(users, conn)
+	delete(connections, userId)
 
+	/* for _, channel := range channels {
+		for _, channelConn := range channel {
+			if channelConn == conn {
+				delete(channels)
+			}
+		}
+	} */
 }
 
 func checkError(e error) {
