@@ -189,13 +189,13 @@ func userDisconnect(conn *websocket.Conn, userId int64) {
 	delete(users, conn)
 	delete(connections, userId)
 
-	/* for _, channel := range channels {
-		for _, channelConn := range channel {
-			if channelConn == conn {
-				delete(channels)
+	for _, channel := range channels {
+		for i, userConn := range channel {
+			if userConn == conn {
+				channel = append(channel[:i], channel[i+1:]...)
 			}
 		}
-	} */
+	}
 }
 
 func checkError(e error) {
