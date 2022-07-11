@@ -133,6 +133,7 @@ func socketHandler(w http.ResponseWriter, r *http.Request) {
 	checkError(e)
 
 	defer conn.Close()
+	defer userDisconnect(conn)
 	conn.SetCloseHandler(socketCloseHandler)
 
 	for {
@@ -152,8 +153,9 @@ func socketCloseHandler(code int, text string) error {
 }
 
 //@TODO Удалить пользователя из списка активных соединений
-func userDisconnect() {
-
+func userDisconnect(conn *websocket.Conn) {
+	// Собственно тут мы и узнаём про отключение пользователя :)
+	fmt.Println(conn.LocalAddr())
 }
 
 func checkError(e error) {
