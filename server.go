@@ -39,10 +39,10 @@ type ResponseData struct {
 	Data   interface{} `json:"data"`
 }
 
-var upgrader = websocket.Upgrader{} // use default options
-var users = map[*websocket.Conn]*db.User{}
-var connections = map[int64]*websocket.Conn{}
-var channels = map[int64][]*websocket.Conn{}
+var upgrader = websocket.Upgrader{}             // use default options
+var users = map[*websocket.Conn]*db.User{}      // WebSocket connection - user
+var connections = map[int64][]*websocket.Conn{} // user ID - WebSocket connections
+var channels = map[int64][]*websocket.Conn{}    // channel ID - WebSocket connections
 
 func checkUserAuth() {
 
@@ -75,7 +75,7 @@ func processMessage(message Message, conn *websocket.Conn) {
 			fmt.Println("User auth success")
 
 			users[conn] = user
-			connections[user.Id] = conn
+			connections[user.Id] = append(connections[user.Id], conn)
 			chs := db.GetUserChannelList(users[conn].Id)
 
 			//@TODO возможно нужен Mutex
@@ -131,26 +131,28 @@ func processMessage(message Message, conn *websocket.Conn) {
 			_, isSenderConnected := users[conn]
 			if isSenderConnected {
 				senderId = users[conn].Id
-			}
 
-			if isSenderConnected {
-				connections[senderId].WriteJSON(TextMessage{
-					Type:   "MESSAGE",
-					Target: "PRIVATE",
-					Id:     receiverId, // receiver user ID
-					Value:  message.Value,
-					UserId: senderId,
-				})
+				for _, connection := range connections[senderId] {
+					connection.WriteJSON(TextMessage{
+						Type:   "MESSAGE",
+						Target: "PRIVATE",
+						Id:     receiverId, // receiver user ID
+						Value:  message.Value,
+						UserId: senderId,
+					})
+				}
 			}
 
 			if _, isReceiverConnected := connections[message.Id]; isReceiverConnected {
-				connections[receiverId].WriteJSON(TextMessage{
-					Type:   "MESSAGE",
-					Target: "PRIVATE",
-					Id:     receiverId, // receiver user ID
-					Value:  message.Value,
-					UserId: senderId,
-				})
+				for _, connection := range connections[receiverId] {
+					connection.WriteJSON(TextMessage{
+						Type:   "MESSAGE",
+						Target: "PRIVATE",
+						Id:     receiverId, // receiver user ID
+						Value:  message.Value,
+						UserId: senderId,
+					})
+				}
 			}
 
 			db.SavePrivateMessage(senderId, receiverId, message.Value)
@@ -166,6 +168,7 @@ func socketHandler(w http.ResponseWriter, r *http.Request) {
 	checkError(e)
 
 	defer conn.Close()
+	defer userDisconnect(conn)
 	conn.SetCloseHandler(socketCloseHandler)
 
 	for {
@@ -185,17 +188,55 @@ func socketCloseHandler(code int, text string) error {
 }
 
 //@TODO Удалить пользователя из списка активных соединений
-func userDisconnect(conn *websocket.Conn, userId int64) {
+func userDisconnect(conn *websocket.Conn) {
 	delete(users, conn)
-	delete(connections, userId)
+	removeDeviceConnByUserId(conn)
+	removeUserConnFromChannels(conn)
+}
 
-	for _, channel := range channels {
-		for i, userConn := range channel {
-			if userConn == conn {
-				channel = append(channel[:i], channel[i+1:]...)
+// Remove a user connection with the same user ID on disconnected device
+func removeDeviceConnByUserId(conn *websocket.Conn) {
+out:
+	for userId := range connections {
+		for deviceIndex, deviceConn := range connections[userId] {
+			if deviceConn == conn {
+				// Remove device connection with specified user ID
+				connections[userId], _ = remove(connections[userId], deviceIndex)
+
+				if len(connections[userId]) == 0 {
+					delete(connections, userId)
+				}
+
+				break out
 			}
 		}
 	}
+}
+
+// Remove a user connection from channels
+func removeUserConnFromChannels(conn *websocket.Conn) {
+	for channelNumber := range channels {
+		for userInChannelIndex, userConn := range channels[channelNumber] {
+			if userConn == conn {
+				// Remove user connection from the specified channel
+				channels[channelNumber], _ = remove(channels[channelNumber], userInChannelIndex)
+
+				if len(channels[channelNumber]) == 0 {
+					delete(channels, channelNumber)
+				}
+
+				break
+			}
+		}
+	}
+}
+
+// Remove an element from the slice by the element index
+func remove(slice []*websocket.Conn, index int) ([]*websocket.Conn, error) {
+	if index >= len(slice) || index < 0 {
+		return nil, fmt.Errorf("index is out of range. Index is %d with slice length %d", index, len(slice))
+	}
+	return append(slice[:index], slice[index+1:]...), nil
 }
 
 func checkError(e error) {
